@@ -8,29 +8,40 @@ COUNTRY = 'CZ'
 # Data used in communication
 CLIENT_LIST = {
     'connect': {
-        'CLIENT_ID':    '7f045eee-7003-4379-9968-9355ed2adb06@apps_vw-dilab_com',       # Client ID for VW-Group Identiy services, can be used to receive VW-Group API token
-        'SCOPE':        'openid profile address cars email birthdate badge mbb phone driversLicense dealers profession vin',    # Requests to vwg-connect.com/ msg.volkswagen.de etc...
-        'TOKEN_TYPES':  'code id_token'                                                 # tokentype=IDK_CONNECT / MBB (API token)
+        'CLIENT_ID':    '7f045eee-7003-4379-9968-9355ed2adb06@apps_vw-dilab_com',       # Client ID for 'CONNECT' service
+        'SCOPE':        'openid profile address cars email birthdate badge mbb phone driversLicense dealers profession vin mileage',    # Requests to vwg-connect.com/ msg.volkswagen.de etc...
+        'TOKEN_TYPES':  'code id_token',                                                # tokentype=IDK_CONNECT / MBB (API token)
+        'SYSTEM_ID':    'CONNECT'                                                       # Most things related to profile or domain vwapps
     },
-    'skoda': {
+    'technical': {
         'CLIENT_ID':    'f9a2359a-b776-46d9-bd0c-db1904343117@apps_vw-dilab_com',       # Client ID for Skoda native API
         'SCOPE':        'openid mbb profile',                                           # Requests to api.connect.skoda-auto.cz
-        'TOKEN_TYPES':  'code id_token'                                                 # tokentype=IDK_TECHNICAL
+        'TOKEN_TYPES':  'code id_token',                                                # tokentype=IDK_TECHNICAL
+        'SYSTEM_ID':    'TECHNICAL'                                                     # Most things related to api.connect.skoda-auto.cz
     },
-    'smartlink': {
-        'CLIENT_ID':    '72f9d29d-aa2b-40c1-bebe-4c7683681d4c@apps_vw-dilab_com',       # SMARTLINK Tokens
+    'cabs': {
+        'CLIENT_ID':    '0f365c6e-8fff-41e0-8b02-2733ed1fe67f@apps_vw-dilab_com',       # ???
+        'SCOPE':        'openid profile phone we_connect_vehicles',                     # No idea what this is used for
+        'TOKEN_TYPES':  'code id_token',                                                # Identified from requests in app 5.2.7
+        'SYSTEM_ID':    'CABS'                                                          # tokentype=???
+    },
+    'dcs': {
+        'CLIENT_ID':    '72f9d29d-aa2b-40c1-bebe-4c7683681d4c@apps_vw-dilab_com',       # Used by SMARTLINK Tokens, DCS??
         'SCOPE':        'openid dealers profile email cars address',                    # Requests to consent.vwgroup.io
-        'TOKEN_TYPES':  'code id_token'                                                 # tokentype=IDK_SMARTLINK
+        'TOKEN_TYPES':  'code id_token',                                                # tokentype=IDK_SMARTLINK
+        'SYSTEM_ID':    'DCS'
     },
 }
 
-
-
-#XCLIENT_ID = '28cd30c6-dee7-4529-a0e6-b1e07ff90b79'
-XCLIENT_ID = 'a83d7e44-c8b7-42b7-b8ca-e478270d2091'
-XAPPVERSION = '3.2.6'
+#XCLIENT_ID = '28cd30c6-dee7-4529-a0e6-b1e07ff90b79'                                    # Android app 3.x?
+#XCLIENT_ID = 'a83d7e44-c8b7-42b7-b8ca-e478270d2091'                                    # Used in Android app 4.x.x
+XCLIENT_ID = 'fef89b3d-a6e0-4525-91eb-a9436e6e469a'                                     # Used in Android app 5.2.7
+XAPPVERSION = '5.2.7'
 XAPPNAME = 'cz.skodaauto.connect'
-USER_AGENT = 'okhttp/3.14.9'
+# IOS App UA
+# USER_AGENT = 'MySkoda/230629002 CFNetwork/1474 Darwin/23.0.0'
+# Android App UA
+USER_AGENT = 'OneConnect/000000148 CFNetwork/1485 Darwin/23.1.0'
 APP_URI = 'skodaconnect://oidc.login/'
 
 # Used when fetching data
@@ -62,10 +73,7 @@ TOKEN_HEADERS = {
     'vwg': {
         'X-Client-Id': XCLIENT_ID,
         'Accept': 'application/json',
-        'X-Platform': 'Linux',
-        #'X-Language-Id': 'XX',
-        #'X-Country-Id': 'XX',
-        #'Accept-Language': 'XX',
+        'X-Platform': 'Android',
         'Accept-Charset': 'UTF-8',
         'Content-Type': 'application/x-www-form-urlencoded',
         'Connection': 'keep-alive',
@@ -74,36 +82,36 @@ TOKEN_HEADERS = {
     },
     'connect': {
         'Accept': 'application/json',
-        'X-Platform': 'Linux',
-        #'X-Language-Id': 'XX',
-        #'X-Country-Id': 'XX',
-        #'Accept-Language': 'XX',
+        'X-Platform': 'Android',
         'Accept-Charset': 'UTF-8',
-        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Type': 'application/json',
         'Connection': 'keep-alive',
         'Accept-Encoding': 'gzip',
         'User-Agent': USER_AGENT,
     },
-    'skoda': {
+    'technical': {
         'Accept': 'application/json',
-        'X-Platform': 'Linux',
-        #'X-Language-Id': 'XX',
-        #'X-Country-Id': 'XX',
-        #'Accept-Language': 'XX',
+        'X-Platform': 'Android',
         'Accept-Charset': 'UTF-8',
-        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Type': 'application/json',
         'Connection': 'keep-alive',
         'Accept-Encoding': 'gzip',
         'User-Agent': USER_AGENT,
     },
-    'smartlink': {
+    'dcs': {
         'Accept': 'application/json',
-        'X-Platform': 'Linux',
-        #'X-Language-Id': 'XX',
-        #'X-Country-Id': 'XX',
-        #'Accept-Language': 'XX',
+        'X-Platform': 'Android',
         'Accept-Charset': 'UTF-8',
-        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Type': 'application/json',
+        'Connection': 'keep-alive',
+        'Accept-Encoding': 'gzip',
+        'User-Agent': USER_AGENT,
+    },
+    'cabs': {
+        'Accept': 'application/json',
+        'X-Platform': 'Android',
+        'Accept-Charset': 'UTF-8',
+        'Content-Type': 'application/json',
         'Connection': 'keep-alive',
         'Accept-Encoding': 'gzip',
         'User-Agent': USER_AGENT,

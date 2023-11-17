@@ -28,7 +28,10 @@ class Instrument:
 
     def setup(self, vehicle, **config):
         self.vehicle = vehicle
-        if not self.is_supported:
+        try:
+            if not self.is_supported:
+                return False
+        except:
             return False
 
         self.configurate(**config)
@@ -87,7 +90,7 @@ class Sensor(Instrument):
                 self.unit = "mi/h"
                 self.convert = True
             elif "l/100 km" == self.unit:
-                self.unit = "l/100 mi"
+                self.unit = "mpg"
                 self.convert = True
             elif "kWh/100 km" == self.unit:
                 self.unit = "kWh/100 mi"
@@ -98,9 +101,9 @@ class Sensor(Instrument):
             elif "km/h" == self.unit:
                 self.unit = "mil/h"
             elif "l/100 km" == self.unit:
-                self.unit = "l/100 mil"
+                self.unit = "l/mil"
             elif "kWh/100 km" == self.unit:
-                self.unit = "kWh/100 mil"
+                self.unit = "kWh/mil"
 
         # Init placeholder for parking heater duration
         config.get('parkingheater', 30)
@@ -126,14 +129,14 @@ class Sensor(Instrument):
             return int(round(val / 1.609344))
         elif val and self.unit and "mi/h" in self.unit and self.convert is True:
             return int(round(val / 1.609344))
-        elif val and self.unit and "gal/100 mi" in self.unit and self.convert is True:
-            return round(val * 0.4251438, 1)
+        elif val and self.unit and "mpg" in self.unit and self.convert is True:
+            return round(val * 235.215, 1)
         elif val and self.unit and "kWh/100 mi" in self.unit and self.convert is True:
             return round(val * 0.4251438, 1)
         elif val and self.unit and "°F" in self.unit and self.convert is True:
             temp = round((val * 9 / 5) + 32, 1)
             return temp
-        elif val and self.unit in ['mil', 'mil/h']:
+        elif val and self.unit in ['mil', 'mil/h', 'l/mil', 'kWh/mil']:
             return val / 10
         else:
             return val
@@ -314,7 +317,7 @@ class Position(Instrument):
 
 class DoorLock(Instrument):
     def __init__(self):
-        super().__init__(component="lock", attr="door_locked", name="Door locked")
+        super().__init__(component="lock", attr="door_locked", name="Door locked", icon="mdi:car-door-lock")
 
     def configurate(self, **config):
         self.spin = config.get('spin', '')
@@ -420,7 +423,6 @@ class RequestHonkAndFlash(Switch):
             'last_timestamp': self.vehicle.honkandflash_action_timestamp
         }
 
-
 class RequestFlash(Switch):
     def __init__(self):
         super().__init__(attr="request_flash", name="Start flashing", icon="mdi:car-parking-lights")
@@ -448,7 +450,6 @@ class RequestFlash(Switch):
             'last_result': self.vehicle.honkandflash_action_status,
             'last_timestamp': self.vehicle.honkandflash_action_timestamp
         }
-
 
 class RequestUpdate(Switch):
     def __init__(self):
@@ -480,7 +481,6 @@ class RequestUpdate(Switch):
             'last_result': self.vehicle.refresh_action_status,
             'last_timestamp': self.vehicle.refresh_action_timestamp
         }
-
 
 class ElectricClimatisation(Switch):
     def __init__(self):
@@ -514,7 +514,6 @@ class ElectricClimatisation(Switch):
             attrs['last_timestamp'] = self.vehicle.climater_action_timestamp
         return attrs
 
-
 class AuxiliaryClimatisation(Switch):
     def __init__(self):
         super().__init__(attr="auxiliary_climatisation", name="Auxiliary Climatisation", icon="mdi:radiator")
@@ -545,7 +544,6 @@ class AuxiliaryClimatisation(Switch):
             'last_timestamp': self.vehicle.climater_action_timestamp
         }
 
-
 class Charging(Switch):
     def __init__(self):
         super().__init__(attr="charging", name="Charging", icon="mdi:battery")
@@ -573,6 +571,67 @@ class Charging(Switch):
             'last_timestamp': self.vehicle.charger_action_timestamp
         }
 
+class MaxChargeCurrent(Switch):
+    def __init__(self):
+        super().__init__(attr="charge_max_ampere", name="Max Charge Current", icon="mdi:battery-charging-outline")
+
+    @property
+    def state(self):
+        # Check charge max ampere valuel. Return True if set to maximum
+        # Return False (Off) for all other values
+        value = self.vehicle.charge_max_ampere
+        if isinstance(value, str):
+            return True if value.lower() == 'maximum' else False
+        elif isinstance(value, int):
+            return True if value == 254 else False
+        return False
+
+    async def turn_on(self):
+        await self.vehicle.set_charger_current('Maximum')
+        await self.vehicle.update()
+
+    async def turn_off(self):
+        await self.vehicle.set_charger_current('Reduced')
+        await self.vehicle.update()
+
+    @property
+    def assumed_state(self):
+        return False
+
+    @property
+    def attributes(self):
+        return {
+            'charge_current': self.vehicle.charge_max_ampere,
+            'last_result': self.vehicle.charger_action_status,
+            'last_timestamp': self.vehicle.charger_action_timestamp
+        }
+
+class PlugAutoUnlock(Switch):
+    def __init__(self):
+        super().__init__(attr="plug_autounlock", name="Plug Auto Unlock", icon="mdi:battery-lock")
+
+    @property
+    def state(self):
+        return self.vehicle.plug_autounlock
+
+    async def turn_on(self):
+        await self.vehicle.set_plug_autounlock('Permanent')
+        await self.vehicle.update()
+
+    async def turn_off(self):
+        await self.vehicle.set_plug_autounlock('Off')
+        await self.vehicle.update()
+
+    @property
+    def assumed_state(self):
+        return False
+
+    @property
+    def attributes(self):
+        return {
+            'last_result': self.vehicle.charger_action_status,
+            'last_timestamp': self.vehicle.charger_action_timestamp
+        }
 
 class WindowHeater(Switch):
     def __init__(self):
@@ -598,9 +657,98 @@ class WindowHeater(Switch):
     def attributes(self):
         return {
             'last_result': self.vehicle.climater_action_status,
-            'last_timestamp': self.vehicle.climater_action_timestamp
+            'last_timestamp': self.vehicle.climater_action_timestamp,
+            "Front":self.vehicle.window_heater_attributes.get("Front", ''),
+            "Rear": self.vehicle.window_heater_attributes.get("Rear", '')
         }
 
+class WindowHeaterNew(Switch):
+    def __init__(self):
+        super().__init__(attr="window_heater_new", name="Window Heater", icon="mdi:car-defrost-rear")
+
+    @property
+    def state(self):
+        return self.vehicle.window_heater_new
+
+    async def turn_on(self):
+        await self.vehicle.set_window_heating('start')
+        await self.vehicle.update()
+
+    async def turn_off(self):
+        await self.vehicle.set_window_heating('stop')
+        await self.vehicle.update()
+
+    @property
+    def assumed_state(self):
+        return False
+
+    @property
+    def attributes(self):
+        return {
+            'last_result': self.vehicle.climater_action_status,
+            'last_timestamp': self.vehicle.climater_action_timestamp,
+            "Front":self.vehicle.window_heater_attributes.get("Front", ''),
+            "Rear": self.vehicle.window_heater_attributes.get("Rear", '')
+        }
+
+class ClimatisationWindowHeat(Switch):
+    def __init__(self):
+        super().__init__(attr="climatisation_window_heat", name="Climatisation Window Heat", icon="mdi:car-defrost-rear")
+
+    @property
+    def state(self):
+        return self.vehicle.climatisation_window_heat
+
+    async def turn_on(self):
+        await self.vehicle.set_window_heating('enabled')
+        await self.vehicle.update()
+
+    async def turn_off(self):
+        await self.vehicle.set_window_heating('disabled')
+        await self.vehicle.update()
+
+    @property
+    def assumed_state(self):
+        return False
+
+    @property
+    def attributes(self):
+        return {
+            'last_result': self.vehicle.climater_action_status,
+            'last_timestamp': self.vehicle.climater_action_timestamp,
+            "Front":self.vehicle.window_heater_attributes.get("Front", ''),
+            "Rear": self.vehicle.window_heater_attributes.get("Rear", '')
+        }
+
+class AuxHeaterDeparture(Switch):
+    def __init__(self):
+        super().__init__(attr="aux_heater_for_departure", name="Allow aux heater next departure", icon="mdi:car-defrost-rear")
+
+    def configurate(self, **config):
+        self.spin = config.get('spin', '')
+
+    @property
+    def state(self):
+        return self.vehicle.aux_heater_for_departure
+
+    async def turn_on(self):
+        await self.vehicle.set_heatersource(source='automatic', spin=self.spin)
+        await self.vehicle.update()
+
+    async def turn_off(self):
+        await self.vehicle.set_heatersource(source='electric')
+        await self.vehicle.update()
+
+    @property
+    def assumed_state(self):
+        return False
+
+    @property
+    def attributes(self):
+        return {
+            'last_result': self.vehicle.timer_action_status,
+            'last_timestamp': self.vehicle.timer_action_timestamp,
+        }
 
 class SeatHeatingFrontLeft(Switch):
     def __init__(self):
@@ -611,14 +759,12 @@ class SeatHeatingFrontLeft(Switch):
         return self.vehicle.seat_heating_front_left
 
     async def turn_on(self):
-        #await self.vehicle.set_seat_heating('start')
-        #await self.vehicle.update()
-        pass
+        await self.vehicle.set_seat_heating('frontLeft', 'enable')
+        await self.vehicle.update()
 
     async def turn_off(self):
-        #await self.vehicle.set_seat_heating('stop')
-        #await self.vehicle.update()
-        pass
+        await self.vehicle.set_seat_heating('frontLeft', 'disable')
+        await self.vehicle.update()
 
     @property
     def assumed_state(self):
@@ -640,14 +786,12 @@ class SeatHeatingFrontRight(Switch):
         return self.vehicle.seat_heating_front_right
 
     async def turn_on(self):
-        #await self.vehicle.set_seat_heating('start')
-        #await self.vehicle.update()
-        pass
+        await self.vehicle.set_seat_heating('frontRight', 'enable')
+        await self.vehicle.update()
 
     async def turn_off(self):
-        #await self.vehicle.set_seat_heating('stop')
-        #await self.vehicle.update()
-        pass
+        await self.vehicle.set_seat_heating('frontRight', 'disable')
+        await self.vehicle.update()
 
     @property
     def assumed_state(self):
@@ -669,14 +813,12 @@ class SeatHeatingRearLeft(Switch):
         return self.vehicle.seat_heating_rear_left
 
     async def turn_on(self):
-        #await self.vehicle.set_seat_heating('start')
-        #await self.vehicle.update()
-        pass
+        await self.vehicle.set_seat_heating('rearLeft', 'enable')
+        await self.vehicle.update()
 
     async def turn_off(self):
-        #await self.vehicle.set_seat_heating('stop')
-        #await self.vehicle.update()
-        pass
+        await self.vehicle.set_seat_heating('rearLeft', 'disable')
+        await self.vehicle.update()
 
     @property
     def assumed_state(self):
@@ -698,14 +840,12 @@ class SeatHeatingRearRight(Switch):
         return self.vehicle.seat_heating_rear_right
 
     async def turn_on(self):
-        #await self.vehicle.set_seat_heating('start')
-        #await self.vehicle.update()
-        pass
+        await self.vehicle.set_seat_heating('rearRight', 'enable')
+        await self.vehicle.update()
 
     async def turn_off(self):
-        #await self.vehicle.set_seat_heating('stop')
-        #await self.vehicle.update()
-        pass
+        await self.vehicle.set_seat_heating('rearRight', 'disable')
+        await self.vehicle.update()
 
     @property
     def assumed_state(self):
@@ -717,7 +857,6 @@ class SeatHeatingRearRight(Switch):
             'last_result': self.vehicle.aircon_action_status,
             'last_timestamp': self.vehicle.aircon_action_timestamp
         }
-
 
 class AirConditionAtUnlock(Switch):
     def __init__(self):
@@ -728,10 +867,12 @@ class AirConditionAtUnlock(Switch):
         return self.vehicle.aircon_at_unlock
 
     async def turn_on(self):
-        pass
+        await self.vehicle.set_aircon_at_unlock(True)
+        await self.vehicle.update()
 
     async def turn_off(self):
-        pass
+        await self.vehicle.set_aircon_at_unlock(False)
+        await self.vehicle.update()
 
     @property
     def assumed_state(self):
@@ -743,7 +884,6 @@ class AirConditionAtUnlock(Switch):
             'last_result': self.vehicle.aircon_action_status,
             'last_timestamp': self.vehicle.aircon_action_timestamp
         }
-
 
 class BatteryClimatisation(Switch):
     def __init__(self):
@@ -771,7 +911,6 @@ class BatteryClimatisation(Switch):
             'last_result': self.vehicle.climater_action_status,
             'last_timestamp': self.vehicle.climater_action_timestamp
         }
-
 
 class PHeaterHeating(Switch):
     def __init__(self):
@@ -803,7 +942,6 @@ class PHeaterHeating(Switch):
             'last_result': self.vehicle.pheater_action_status,
             'last_timestamp': self.vehicle.pheater_action_timestamp
         }
-
 
 class PHeaterVentilation(Switch):
     def __init__(self):
@@ -869,7 +1007,6 @@ class DepartureTimer1(Switch):
     @property
     def attributes(self):
         return dict(self.vehicle.departure1)
-
 
 class DepartureTimer2(Switch):
     def __init__(self):
@@ -958,6 +1095,69 @@ class RequestResults(Sensor):
     def attributes(self):
         return dict(self.vehicle.request_results)
 
+class ChargingPower(Sensor):
+    def __init__(self):
+        super().__init__(attr="charging_power", name="Charging Power", icon="mdi:flash", unit="W", device_class="power")
+
+    @property
+    def state(self):
+        return self.vehicle.charging_power
+
+    @property
+    def assumed_state(self):
+        return False
+
+    @property
+    def attributes(self):
+        values = {
+            "max_power": self.vehicle.max_charging_power
+        }
+        return values
+
+class CarInfo(Sensor):
+    def __init__(self):
+        super().__init__(attr="model", name="Car Info", icon="mdi:information-outline", unit=None)
+
+    @property
+    def state(self):
+        return self.vehicle.vin
+
+    @property
+    def assumed_state(self):
+        return False
+
+    @property
+    def attributes(self):
+        values = {}
+        if self.vehicle.is_engine_capacity_supported:
+            values['engine'] = {
+                "type": self.vehicle.engine_type,
+                "power_in_kw": self.vehicle.engine_power,
+                "capacity_in_liter": self.vehicle.engine_capacity
+            }
+        else:
+            if self.vehicle.is_battery_capacity_supported:
+                values['engine'] = {
+                    "engine_type": self.vehicle.engine_type,
+                    "power_in_kw": self.vehicle.engine_power,
+                    "battery_capacity_kwh": self.vehicle.battery_capacity
+                }
+            else:
+                values['engine'] = {
+                    "engine_type": self.vehicle.engine_type,
+                    "power_in_kw": self.vehicle.engine_power
+                }
+
+        values['model'] = {
+            "model": self.vehicle.model,
+            "manufactured": self.vehicle.model_year
+        }
+        if self.vehicle.is_model_image_large_supported:
+            values['model']['image_url_large'] = self.vehicle.model_image_large
+        if self.vehicle.is_model_image_small_supported:
+            values['model']['image_url_small'] = self.vehicle.model_image_small
+
+        return values
 
 def create_instruments():
     return [
@@ -967,12 +1167,16 @@ def create_instruments():
         RequestFlash(),
         RequestHonkAndFlash(),
         RequestUpdate(),
+        PlugAutoUnlock(),
+        AuxHeaterDeparture(),
         WindowHeater(),
-        #SeatHeatingFrontLeft(), # Not yet implemented
-        #SeatHeatingFrontRight(), # Not yet implemented
-        #SeatHeatingRearLeft(), # Not yet implemented
-        #SeatHeatingRearRight(), # Not yet implemented
-        #AirConditionAtUnlock(), # Not yet implemented
+        WindowHeaterNew(),
+        ClimatisationWindowHeat(),
+        SeatHeatingFrontLeft(),
+        SeatHeatingFrontRight(),
+        SeatHeatingRearLeft(),
+        SeatHeatingRearRight(),
+        AirConditionAtUnlock(),
         BatteryClimatisation(),
         ElectricClimatisation(),
         AuxiliaryClimatisation(),
@@ -980,8 +1184,11 @@ def create_instruments():
         PHeaterHeating(),
         #ElectricClimatisationClimate(),
         #CombustionClimatisationClimate(),
+        CarInfo(),
         Charging(),
+        MaxChargeCurrent(),
         RequestResults(),
+        ChargingPower(),
         DepartureTimer1(),
         DepartureTimer2(),
         DepartureTimer3(),
@@ -990,6 +1197,7 @@ def create_instruments():
             name="Odometer",
             icon="mdi:speedometer",
             unit="km",
+            device_class="distance"
         ),
         Sensor(
             attr="battery_level",
@@ -1057,14 +1265,8 @@ def create_instruments():
             attr="charging_time_left",
             name="Charging time left",
             icon="mdi:battery-charging-100",
-            unit="h",
-        ),
-        Sensor(
-            attr="charging_power",
-            name="Charging power",
-            icon="mdi:flash",
-            unit="W",
-            device_class="power"
+            unit="min",
+            device_class="duration"
         ),
         Sensor(
             attr="charge_rate",
@@ -1077,18 +1279,21 @@ def create_instruments():
             name="Electric range",
             icon="mdi:car-electric",
             unit="km",
+            device_class="distance"
         ),
         Sensor(
             attr="combustion_range",
             name="Combustion range",
             icon="mdi:car",
             unit="km",
+            device_class="distance"
         ),
         Sensor(
             attr="combined_range",
             name="Combined range",
             icon="mdi:car",
             unit="km",
+            device_class="distance"
         ),
         Sensor(
             attr="charge_max_ampere",
@@ -1108,7 +1313,8 @@ def create_instruments():
             attr="climatisation_time_left",
             name="Climatisation time left",
             icon="mdi:clock",
-            unit="h",
+            unit="min",
+            device_class="duration"
         ),
         Sensor(
             attr="trip_last_average_speed",
@@ -1136,7 +1342,7 @@ def create_instruments():
         ),
         Sensor(
             attr="trip_last_length",
-            name="Last trip length",
+            name="Last trip distance",
             icon="mdi:map-marker-distance",
             unit="km",
         ),
@@ -1165,6 +1371,150 @@ def create_instruments():
             unit="kWh/100 km",
         ),
         Sensor(
+            attr="trip_last_total_electric_consumption",
+            name="Last trip total electric consumption",
+            icon="mdi:car-battery",
+            unit="kWh/100 km",
+        ),
+        Sensor(
+            attr="trip_last_start_mileage",
+            name="Last trip start mileage",
+            icon="mdi:map-marker-distance",
+            unit="km",
+        ),
+        Sensor(
+            attr="trip_longterm_average_speed",
+            name="Longterm average speed",
+            icon="mdi:speedometer",
+            unit="km/h",
+        ),
+        Sensor(
+            attr="trip_longterm_average_electric_consumption",
+            name="Longterm average electric consumption",
+            icon="mdi:car-battery",
+            unit="kWh/100 km",
+        ),
+        Sensor(
+            attr="trip_longterm_average_fuel_consumption",
+            name="Longterm average fuel consumption",
+            icon="mdi:fuel",
+            unit="l/100 km",
+        ),
+        Sensor(
+            attr="trip_longterm_duration",
+            name="Longterm duration",
+            icon="mdi:clock",
+            unit="min",
+        ),
+        Sensor(
+            attr="trip_longterm_length",
+            name="Longterm distance",
+            icon="mdi:map-marker-distance",
+            unit="km",
+        ),
+        Sensor(
+            attr="trip_longterm_recuperation",
+            name="Longterm recuperation",
+            icon="mdi:battery-plus",
+            unit="kWh/100 km",
+        ),
+        Sensor(
+            attr="trip_longterm_average_recuperation",
+            name="Longterm average recuperation",
+            icon="mdi:battery-plus",
+            unit="kWh/100 km",
+        ),
+        Sensor(
+            attr="trip_longterm_average_auxillary_consumption",
+            name="Longterm average auxillary consumption",
+            icon="mdi:flash",
+            unit="kWh/100 km",
+        ),
+        Sensor(
+            attr="trip_longterm_average_aux_consumer_consumption",
+            name="Longterm average auxillary consumer consumption",
+            icon="mdi:flash",
+            unit="kWh/100 km",
+        ),
+        Sensor(
+            attr="trip_longterm_total_electric_consumption",
+            name="Longterm total electric consumption",
+            icon="mdi:car-battery",
+            unit="kWh/100 km",
+        ),
+        Sensor(
+            attr="trip_longterm_start_mileage",
+            name="Longterm start mileage",
+            icon="mdi:map-marker-distance",
+            unit="km",
+        ),
+        Sensor(
+            attr="trip_cyclic_average_speed",
+            name="Refuel average speed",
+            icon="mdi:speedometer",
+            unit="km/h",
+        ),
+        Sensor(
+            attr="trip_cyclic_average_electric_consumption",
+            name="Refuel average electric consumption",
+            icon="mdi:car-battery",
+            unit="kWh/100 km",
+        ),
+        Sensor(
+            attr="trip_cyclic_average_fuel_consumption",
+            name="Refuel average fuel consumption",
+            icon="mdi:fuel",
+            unit="l/100 km",
+        ),
+        Sensor(
+            attr="trip_cyclic_duration",
+            name="Refuel duration",
+            icon="mdi:clock",
+            unit="min",
+        ),
+        Sensor(
+            attr="trip_cyclic_length",
+            name="Refuel distance",
+            icon="mdi:map-marker-distance",
+            unit="km",
+        ),
+        Sensor(
+            attr="trip_cyclic_recuperation",
+            name="Refuel recuperation",
+            icon="mdi:battery-plus",
+            unit="kWh/100 km",
+        ),
+        Sensor(
+            attr="trip_cyclic_average_recuperation",
+            name="Refuel average recuperation",
+            icon="mdi:battery-plus",
+            unit="kWh/100 km",
+        ),
+        Sensor(
+            attr="trip_cyclic_average_auxillary_consumption",
+            name="Refuel average auxillary consumption",
+            icon="mdi:flash",
+            unit="kWh/100 km",
+        ),
+        Sensor(
+            attr="trip_cyclic_average_aux_consumer_consumption",
+            name="Refuel average auxillary consumer consumption",
+            icon="mdi:flash",
+            unit="kWh/100 km",
+        ),
+        Sensor(
+            attr="trip_cyclic_total_electric_consumption",
+            name="Refuel total electric consumption",
+            icon="mdi:car-battery",
+            unit="kWh/100 km",
+        ),
+        Sensor(
+            attr="trip_cyclic_start_mileage",
+            name="Refuel start mileage",
+            icon="mdi:map-marker-distance",
+            unit="km",
+        ),
+        Sensor(
             attr="model_image_large",
             name="Model image URL (Large)",
             icon="mdi:file-image",
@@ -1173,12 +1523,6 @@ def create_instruments():
             attr="model_image_small",
             name="Model image URL (Small)",
             icon="mdi:file-image",
-        ),
-        Sensor(
-            attr="trip_last_total_electric_consumption",
-            name="Last trip total electric consumption",
-            icon="mdi:car-battery",
-            unit="kWh/100 km",
         ),
         Sensor(
             attr="pheater_status",
@@ -1224,7 +1568,8 @@ def create_instruments():
             attr="door_locked",
             name="Doors locked",
             device_class="lock",
-            reverse_state=False
+            reverse_state=False,
+            icon="mdi:car-door-lock"
         ),
         BinarySensor(
             attr="door_closed_left_front",
@@ -1330,31 +1675,31 @@ def create_instruments():
             name="Request in progress",
             device_class="connectivity"
         ),
-        BinarySensor(
-            attr="seat_heating_front_left",
-            name="Seat heating front left",
-            device_class="heat"
-        ),
-        BinarySensor(
-            attr="seat_heating_front_right",
-            name="Seat heating front right",
-            device_class="heat"
-        ),
-        BinarySensor(
-            attr="seat_heating_rear_left",
-            name="Seat heating rear left",
-            device_class="heat"
-        ),
-        BinarySensor(
-            attr="seat_heating_rear_right",
-            name="Seat heating rear right",
-            device_class="heat"
-        ),
-        BinarySensor(
-            attr="aircon_at_unlock",
-            name="Air-conditioning at unlock",
-            device_class=None
-        ),
+        #BinarySensor(
+        #    attr="seat_heating_front_left",
+        #    name="Seat heating front left",
+        #    device_class="heat"
+        #),
+        #BinarySensor(
+        #    attr="seat_heating_front_right",
+        #    name="Seat heating front right",
+        #    device_class="heat"
+        #),
+        #BinarySensor(
+        #    attr="seat_heating_rear_left",
+        #    name="Seat heating rear left",
+        #    device_class="heat"
+        #),
+        #BinarySensor(
+        #    attr="seat_heating_rear_right",
+        #    name="Seat heating rear right",
+        #    device_class="heat"
+        #),
+        #BinarySensor(
+        #    attr="aircon_at_unlock",
+        #    name="Air-conditioning at unlock",
+        #    device_class=None
+        #),
     ]
 
 
@@ -1367,4 +1712,3 @@ class Dashboard:
             if instrument.setup(vehicle, **config)
         ]
         _LOGGER.debug("Supported instruments: " + ", ".join(str(inst.attr) for inst in self.instruments))
-

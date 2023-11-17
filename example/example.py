@@ -24,7 +24,21 @@ logging.basicConfig(level=logging.DEBUG)
 USERNAME = 'email@domain.com'
 PASSWORD = 'password!'
 PRINTRESPONSE = False
+MILES = False
 INTERVAL = 20
+
+# If you wish to use stored tokens, this is an example on how to format data sent to restore_tokens method
+# Populate each 'client' as needed with the refresh_token as it can be used to fetch new access, id and refresh tokens
+# The known clients are: technical, connect, "vwg", cabs and dcs. The main client is "technical" and can be used to fetch the rest
+TOKENS = {
+    'technical': 'TOKENDATA',
+    'connect': 'TOKENDATA',
+    'vwg': None,    # You can store and restore this refresh token but it's more robust to reauth the vwg client
+    'cabs': None,   # Not sure if this is used and in that case for what
+    'dcs': None,    # Smartlink
+}
+# Comment out the following line to use stored tokens above, set TOKENS=None to do fresh login
+TOKENS = None
 
 COMPONENTS = {
     'sensor': 'sensor',
@@ -34,8 +48,12 @@ COMPONENTS = {
     'switch': 'switch',
 }
 
+# Set to true to enable all resources
+RESOURCES_ALL = True
+# OR set above to False and comment out resources in this list to disable them
 RESOURCES = [
 		"adblue_level",
+        "aircon_at_unlock",
 		"auxiliary_climatisation",
 		"battery_level",
 		"charge_max_ampere",
@@ -68,6 +86,7 @@ RESOURCES = [
 		"hood_closed",
 		"last_connected",
 		"lock_action_status",
+        "model",
 		"oil_inspection",
 		"oil_inspection_distance",
 		"outside_temperature",
@@ -76,6 +95,7 @@ RESOURCES = [
 		"pheater_heating",
 		"pheater_status",
 		"pheater_ventilation",
+        "plug_autounlock",
 		"position",
 		"refresh_action_status",
 		"refresh_data",
@@ -84,18 +104,37 @@ RESOURCES = [
 		"request_in_progress",
 		"request_results",
 		"requests_remaining",
+        "seat_heating_front_left",
+        "seat_heating_front_right",
+        "seat_heating_rear_left",
+        "seat_heating_rear_right",
 		"service_inspection",
 		"service_inspection_distance",
 		"sunroof_closed",
 		"trip_last_average_auxillary_consumption",
+        "trip_last_average_aux_consumer_consumption",
 		"trip_last_average_electric_consumption",
 		"trip_last_average_fuel_consumption",
+        "trip_last_average_recuperation",
 		"trip_last_average_speed",
 		"trip_last_duration",
 		"trip_last_entry",
 		"trip_last_length",
 		"trip_last_recuperation",
 		"trip_last_total_electric_consumption",
+        "trip_last_start_mileage",
+		"trip_longterm_average_auxillary_consumption",
+        "trip_longterm_average_aux_consumer_consumption",
+		"trip_longterm_average_electric_consumption",
+		"trip_longterm_average_fuel_consumption",
+        "trip_longterm_average_recuperation",
+		"trip_longterm_average_speed",
+		"trip_longterm_duration",
+		"trip_longterm_entry",
+		"trip_longterm_length",
+		"trip_longterm_recuperation",
+		"trip_longterm_total_electric_consumption",
+        "trip_longterm_start_mileage",
 		"trunk_closed",
 		"trunk_locked",
 		"vehicle_moving",
@@ -104,30 +143,57 @@ RESOURCES = [
 		"window_closed_right_back",
 		"window_closed_right_front",
 		"window_heater",
+        "window_heater_new",
 		"windows_closed",
         "seat_heating"
 ]
 
 def is_enabled(attr):
     """Return true if the user has enabled the resource."""
+    if RESOURCES_ALL is True:
+        return True
     return attr in RESOURCES
 
 async def main():
     """Main method."""
     async with ClientSession(headers={'Connection': 'keep-alive'}) as session:
+        login_success = False
         print('')
         print('########################################')
         print('#      Logging on to Skoda Connect     #')
         print('########################################')
         print(f"Initiating new session to Skoda Connect with {USERNAME} as username")
-        connection = Connection(session, USERNAME, PASSWORD, PRINTRESPONSE)
-        print("Attempting to login to the Skoda Connect service")
-        print(datetime.now())
-        if await connection.doLogin():
+        try:
+            connection = Connection(session, USERNAME, PASSWORD, PRINTRESPONSE)
+            if TOKENS is not None:
+                print("Attempting restore of tokens")
+                if await connection.restore_tokens(TOKENS):
+                    print("Token restore succeeded")
+                    login_success = True
+            if not login_success:
+                print("Attempting to login to the Skoda Connect service")
+                login_success = await connection.doLogin()
+        except Exception as e:
+            print(f"Login failed: {e}")
+            exit()
+
+        if login_success:
             print('Login success!')
             print(datetime.now())
             print('Fetching vehicles associated with account.')
-            await connection.get_vehicles()
+            try:
+                await connection.get_vehicles()
+            except Exception as e:
+                print(f'Error encountered when fetching vehicles: {e}')
+                exit()
+
+            # Need to get data before we know what sensors are available
+            print('Fetch latest data for all vehicles.')
+            try:
+                await connection.update_all()
+            except Exception as e:
+                print(f'Error encountered when fetching vehicle data: {e}')
+                exit()
 
             instruments = set()
             for vehicle in connection.vehicles:
@@ -135,15 +201,18 @@ async def main():
                 print('########################################')
                 print('#         Setting up dashboard         #')
                 print('########################################')
-                dashboard = vehicle.dashboard(mutable=True)
+                try:
+                    dashboard = vehicle.dashboard(mutable=True, miles=MILES)
+                    for instrument in (
+                            instrument
+                            for instrument in dashboard.instruments
+                            if instrument.component in COMPONENTS
+                            and is_enabled(instrument.slug_attr)):
+                        instruments.add(instrument)
+                except Exception as e:
+                    print(f'Failed to load instruments: {e}')
+                    exit()
 
-                for instrument in (
-                        instrument
-                        for instrument in dashboard.instruments
-                        if instrument.component in COMPONENTS
-                        and is_enabled(instrument.slug_attr)):
-
-                    instruments.add(instrument)
             print('')
             print('########################################')
             print('#          Vehicles discovered         #')
@@ -285,6 +354,6 @@ async def main():
             #print(vehicle.timer_action_status)
 
 if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
+    loop = asyncio.new_event_loop()
     loop.run_until_complete(main())
 

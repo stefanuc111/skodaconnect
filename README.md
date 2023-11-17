@@ -2,7 +2,15 @@
 ![PyPi](https://img.shields.io/pypi/v/skodaconnect?label=latest%20pypi)
 ![Downloads PyPi](https://img.shields.io/pypi/dm/skodaconnect)
 
+# **Contributors needed**
+Keeping up with changes made from VAG group to the API requires coders familiar with the code and structure for reverse engineering the changes into this code. Contributions in the form of raised issues and pull requests are much needed in order to maintain the functionality for all different models of Skoda cars.
+Up until now I have maintained this code after lendy007 and I have had my own interest in it since I've been using it for controlling my own Skoda. My Skoda Connect subscription is now expired and I won't be renewing it because I'm switching from my current Skoda to another car in the near future. This means that this project needs you, someone familiar with Python and an interest in keeping this code alive, in order to not stop working after the next VAG update.
+Please contact me on the Discord or through email if this person is you.
+
+/TheFarfar (Farfar)
+
 # Skoda Connect
+**UNOFFICIAL** library for communicating with Skoda Connect.
 Fork of https://github.com/robinostlund/volkswagencarnet,
 modified to support Skoda Connect.
 Changes has been made to mimic the MySkoda mobile app.
@@ -11,6 +19,8 @@ This is an API library for Skoda connected cars.
 The library is reverse engineered by intercepting HTTP requests from
 MySkoda app, there is no official API. Use at your own risk.
 If the Skoda API changes, this library may stop working without warning.
+Version 1.x is in maintenance only.
+All feature requests and major changes will be for version 2.0 (under development)
 
 ## Information
 
@@ -38,6 +48,7 @@ Heating is what it sounds like and ventilation is used to ventilate/cool the car
 ## Thanks to
 
 - [RobinostLund](https://github.com/robinostlund/volkswagencarnet) for initial project for Volkswagen Carnet which this is based on initially
+- [lendy007](https://github.com/lendy007) for creating intial release for Skoda cars
 - [Farfar](https://github.com/Farfar) for modifications related to electric engines
 - [tanelvakker](https://github.com/tanelvakker) for modifications related to correct SPIN handling for various actions and using correct URLs also for MY2021
 - [wieshka](https://github.com/wieshka) for help with Skoda Enyaq iV development
@@ -73,10 +84,12 @@ car.set_charger(action = "start")                          # action = "start" or
 car.set_charger_current(value=<int/str>                    # value = integer 1-255 or Maximum/Reduced (For PHEV: 252=Reduced and 254=Maximum)
 car.set_charge_limit(value=<int>)                          # value = integer 0-100 in 10 increments. Valid values is PHEV: 0-50, EV: 50-100.
 car.set_battery_climatisation(mode = False)                # mode = False or True
-car.set_climatisation(mode = "auxilliary", spin="1234")    # mode = "auxilliary", "electric" or "off". spin is S-PIN and only needed for aux heating
+car.set_climatisation(mode = "auxilliary", spin="1234")    # mode = "auxilliary", "electric", "off". SPIN only needed for aux heating
 car.set_climatisation_temp(temperature = 22)               # temperature = integer from 16 to 30
 car.set_window_heating(action = "start")                   # action = "start" or "stop"
+ - car.set_window_heating(action = "enabled")              # action = "enabled/disabled", enable/disable window heating for climatisation
 car.set_lock(action = "unlock", spin = "1234")             # action = "unlock" or "lock". spin = SPIN, needed for both
+car.set_plug_autounlock(setting = "on")                    # setting = "on"/"off". Enable/disable auto unlock of plug when charged
 car.set_pheater(mode = "heating", spin = "1234")           # action = "heating", "ventilation" or "off". spin = SPIN, not needed for off
 car.set_charge_limit(limit = 30)                           # limit = 0,10,20,30,40,50
 car.set_timer_active(id = 1, action = "on"}                # id = 1, 2, 3, action = "on" or "off".
@@ -100,3 +113,17 @@ Refrain from using methods starting with _, they are intended for internal use o
 
 ## Further help or contributions
 For questions, further help or contributions you can join the Discord server at https://discord.gg/826X9jEtCh
+
+## Building
+We are using a `pyproject.toml` style of building, with `flit`.
+To build your own version of skodaconnect, use the following steps:
+
+1. Get the current source from GitHub
+2. Make sure you have flit installed:
+```
+pip install flit
+```
+3. Build the project
+```
+flit build
+```
